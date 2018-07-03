@@ -1,0 +1,104 @@
+﻿<div class="container">
+    <br /><br />
+
+    @(Html.ShieldGrid()
+        .Name("mygrid")
+        .DataSource(ds => ds
+            .Events(eb => eb
+                .Error(@<text>
+                    function (event) {
+                        if (event.errorType == "transport") {
+                            // transport error is an ajax error; event holds the xhr object
+                            alert("transport error: " + event.error.statusText);
+
+                            // reload the data source if the operation that failed was save
+                            if (event.operation == "save") {
+                                this.read();
+                            }
+                        }
+                        else {
+                            // other data source error - validation, etc
+                            alert(event.errorType + " error: " + event.error);
+                        }
+                    }
+                </text>)
+            )
+            .Remote(r => r
+                .ReadConfiguration(rc => rc
+                    .Add("type", "GET")
+                    .Add("url", "/api/Users")
+                    .Add("dataType", "json")
+                )
+                .ModifyObject(mo => mo
+                    .Modify(Shield.Mvc.UI.DataSource.ModifyOptions.Create, @<text>
+                        function (items, success, error) {
+                            // delete the Id field
+                            delete items[0].data.Id;
+
+                            $.ajax({
+                                type: "POST",
+                                url: "/api/Users",
+                                dataType: "json",
+                                contentType: "application/json",
+                                data: JSON.stringify(items[0].data)
+                            }).done(function(data, textStatus, xhr) {
+                                if (xhr.readyState == 4) {
+                                    if (xhr.status == 201) {
+                                        // refresh the grid data source
+                                        $("#mygrid").swidget("Grid").dataSource.read();
+                                        return;
+                                    }
+                                }
+
+                                error(xhr);
+                            }).fail(error);
+                        }
+                    </text>)
+                    .Modify(Shield.Mvc.UI.DataSource.ModifyOptions.Update, @<text>
+                        function (items, success, error) {
+                            $.ajax({
+                                type: "PUT",
+                                url: "/api/Users/" + items[0].data.Id,
+                                dataType: "json",
+                                contentType: "application/json",
+                                data: JSON.stringify(items[0].data)
+                            }).then(success, error);
+                        }
+                    </text>)
+                    .Modify(Shield.Mvc.UI.DataSource.ModifyOptions.Remove, @<text>
+                        function (items, success, error) {
+                            $.ajax({
+                                type: "DELETE",
+                                url: "/api/Users/" + items[0].data.Id
+                            }).then(success, error);
+                        }
+                    </text>)
+                )
+            )
+            .Schema(sb => sb
+                .Fields("Id", fb => fb.Path("Id").Type(Shield.Mvc.UI.DataSource.FieldType.Number))
+                .Fields("Email", fb => fb.Path("Email").Type(Shield.Mvc.UI.DataSource.FieldType.String))
+                .Fields("Name", fb => fb.Path("Name").Type(Shield.Mvc.UI.DataSource.FieldType.String))
+                .Fields("Age", fb => fb.Path("Age").Type(Shield.Mvc.UI.DataSource.FieldType.Number))
+            )
+        )
+        .Columns(c => c.Field("Id").Title("User Id").Width(100).Editable(false))
+        .Columns(c => c.Field("Email").Title("Email"))
+        .Columns(c => c.Field("Name").Title("Name"))
+        .Columns(c => c.Field("Age").Title("Age").Width(100))
+        .Columns(c => c
+            .Width(150)
+            .Title(" ")
+            .Buttons(b => b.CommandName("edit").Caption("Edit"))
+            .Buttons(b => b.CommandName("delete").Caption("Delete"))
+        )
+        .ToolBar(tb => tb
+            .Buttons(b => b.CommandName("insert").Caption("Add User"))
+            .Position(Shield.Mvc.UI.Grid.PositionOptions.Top)
+        )
+        .Sorting(true)
+        .RowHover(false)
+        .PagingConfiguration(p => p.PageSize(5))
+        .Editing(e => e.Enabled(true).Type(Shield.Mvc.UI.Grid.EditingTypeOptions.Row))
+    )
+</div>
